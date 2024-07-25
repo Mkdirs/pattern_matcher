@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use crate::{begin_match, Exactly, MatchingPipeline, PipelineError, Quantifiable, SymbolGroup};
+use crate::{begin_match, quantifiers::WithQuantifier, Exactly, MatchingPipeline, PipelineError, SymbolGroup};
 
 #[test]
 fn should_match_all_symbols() -> Result<(), PipelineError<'static, char>>{
