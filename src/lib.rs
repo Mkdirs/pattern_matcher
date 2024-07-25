@@ -232,7 +232,7 @@ impl<'a, Symbol> MatchingPipeline<Symbol> where Symbol: PartialEq+Clone+Debug+Co
         Err(PipelineError::SymbolNotMatchAnyOf { expected: symbols, actual })
     }
 
-    /// Expects that the current symbol is part of [Group](SymbolGroup)
+    /// Expects that the current symbol is part of [SymbolGroup]
     pub fn match_any_of_group(mut self, group: SymbolGroup<'a, Symbol>) -> PipelineResult<'a, Symbol>{
         if self.reached_eos {
             return Err(PipelineError::UnexpectedEos);
@@ -276,10 +276,10 @@ impl<'a, Symbol> MatchingPipeline<Symbol> where Symbol: PartialEq+Clone+Debug+Co
         Ok(self)
     }
 
-    /// Matches all symbols until one is part of [Group](SymbolGroup) or reaches end of stream
+    /// Matches all symbols until one is part of [SymbolGroup] or reaches end of stream
     /// 
     /// The delimiting symbol is also matched
-    pub fn match_until_group<Group>(mut self, group: &SymbolGroup<'a, Symbol>) -> PipelineResult<'a, Symbol> {
+    pub fn match_until_group(mut self, group: &SymbolGroup<'a, Symbol>) -> PipelineResult<'a, Symbol> {
         loop {
             if self.reached_eos {
                 break;
