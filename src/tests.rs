@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use crate::{begin_match, quantifiers::WithQuantifier, Exactly, MatchingPipeline, PipelineError, SymbolGroup};
+use crate::{begin_match, quantifiers::WithQuantifier, AtLeast, AtMost, Exactly, MatchingPipeline, PipelineError, SymbolGroup, ZeroOrOne};
 
 #[test]
 fn should_match_all_symbols() -> Result<(), PipelineError<'static, char>>{
@@ -217,5 +217,212 @@ fn quantifier_exactly_do_not_match() -> Result<(), PipelineError<'static, char>>
     let expected = Err(PipelineError::WrongPattern { expected: &['a', 'b', 'a'], actual: vec!['O'] });
 
     assert_eq!(result, expected);
+    Ok(())
+}
+
+#[test]
+fn quantifier_zero_or_one_with_trailing_expectation() -> Result<(), PipelineError<'static, char>>{
+    let candidate1 = "abc";
+    let candidate2 = "ab";
+    let candidate3 = "ac";
+    let candidate4 = "axc";
+    
+    let result1 = begin_match(candidate1)
+    .match_symbol(&'a')?
+    .with_quantifier(ZeroOrOne, |p| p.match_symbol(&'b'))?
+    .match_symbol(&'c')?;
+
+    let expected1 = MatchingPipeline{
+        unmatched: vec![],
+        matched: vec!['a', 'b', 'c'],
+        reached_eos: true
+    };
+
+    let result2 = begin_match(candidate2)
+    .match_symbol(&'a')?
+    .with_quantifier(ZeroOrOne, |p| p.match_symbol(&'b'))?
+    .match_symbol(&'c');
+
+    let expected2 = Err(PipelineError::UnexpectedEos);
+
+    let result3 = begin_match(candidate3)
+    .match_symbol(&'a')?
+    .with_quantifier(ZeroOrOne, |p| p.match_symbol(&'b'))?
+    .match_symbol(&'c')?;
+
+    let expected3 = MatchingPipeline{
+        unmatched: vec![],
+        matched: vec!['a', 'c'],
+        reached_eos: true
+    };
+
+    let result4 = begin_match(candidate4)
+    .match_symbol(&'a')?
+    .with_quantifier(ZeroOrOne, |p| p.match_symbol(&'b'))?
+    .match_symbol(&'c');
+
+    let expected4 = Err(PipelineError::WrongSymbol { expected: &'c', actual: 'x' });
+
+    assert_eq!(result1, expected1);
+    assert_eq!(result2, expected2);
+    assert_eq!(result3, expected3);
+    assert_eq!(result4, expected4);
+
+    
+
+    Ok(())
+}
+
+
+#[test]
+fn quantifier_zero_or_one_without_trailing_expectation() -> Result<(), PipelineError<'static, char>>{
+    let candidate1 = "abc";
+    let candidate2 = "ab";
+    let candidate3 = "ac";
+    let candidate4 = "axc";
+    
+    let result1 = begin_match(candidate1)
+    .match_symbol(&'a')?
+    .with_quantifier(ZeroOrOne, |p| p.match_symbol(&'b'))?;
+
+    let expected1 = MatchingPipeline{
+        unmatched: vec!['c'],
+        matched: vec!['a', 'b'],
+        reached_eos: false
+    };
+
+    let result2 = begin_match(candidate2)
+    .match_symbol(&'a')?
+    .with_quantifier(ZeroOrOne, |p| p.match_symbol(&'b'))?;
+
+    let expected2 = MatchingPipeline{
+        unmatched: vec![],
+        matched: vec!['a', 'b'],
+        reached_eos: true
+    };
+
+    let result3 = begin_match(candidate3)
+    .match_symbol(&'a')?
+    .with_quantifier(ZeroOrOne, |p| p.match_symbol(&'b'))?;
+
+    let expected3 = MatchingPipeline{
+        unmatched: vec!['c'],
+        matched: vec!['a'],
+        reached_eos: false
+    };
+
+    let result4 = begin_match(candidate4)
+    .match_symbol(&'a')?
+    .with_quantifier(ZeroOrOne, |p| p.match_symbol(&'b'))?;
+
+    let expected4 = MatchingPipeline{
+        unmatched: vec!['x', 'c'],
+        matched: vec!['a'],
+        reached_eos: false
+    };
+
+    assert_eq!(result1, expected1);
+    assert_eq!(result2, expected2);
+    assert_eq!(result3, expected3);
+    assert_eq!(result4, expected4);
+
+    
+
+    Ok(())
+}
+
+#[test]
+fn quantifier_at_least() -> Result<(), PipelineError<'static, char>> {
+    let result1 = begin_match("abbbc")
+    .match_symbol(&'a')?
+    .with_quantifier(AtLeast(3), |p| p.match_symbol(&'b'))?
+    .match_symbol(&'c')?;
+
+    let expected1 = MatchingPipeline{
+        unmatched: vec![],
+        matched: vec!['a', 'b', 'b', 'b', 'c'],
+        reached_eos: true
+    };
+
+    let result2 = begin_match("abb")
+    .match_symbol(&'a')?
+    .with_quantifier(AtLeast(3), |p| p.match_symbol(&'b'));
+
+    let expected2 = Err(PipelineError::UnexpectedEos);
+
+    let result3 = begin_match("abx")
+    .match_symbol(&'a')?
+    .with_quantifier(AtLeast(3), |p| p.match_symbol(&'b'));
+
+    let expected3 = Err(PipelineError::WrongSymbol { expected: &'b', actual: 'x' });
+
+    let result4 = begin_match("abbbc")
+    .match_symbol(&'a')?
+    .with_quantifier(AtLeast(1), |p| p.match_symbol(&'b'))?
+    .match_symbol(&'c')?;
+
+    let expected4 = MatchingPipeline{
+        unmatched: vec![],
+        matched: vec!['a', 'b', 'b', 'b', 'c'],
+        reached_eos: true
+    };
+
+    let result5 = begin_match("abbc")
+    .match_symbol(&'a')?
+    .with_quantifier(AtLeast(0), |p| p.match_symbol(&'b'))?
+    .match_symbol(&'c')?;
+
+    let expected5 = MatchingPipeline{
+        unmatched: vec![],
+        matched: vec!['a', 'b', 'b', 'c'],
+        reached_eos: true
+    };
+
+    let result6 = begin_match("ac")
+    .match_symbol(&'a')?
+    .with_quantifier(AtLeast(0), |p| p.match_symbol(&'b'))?
+    .match_symbol(&'c')?;
+
+    let expected6 = MatchingPipeline{
+        unmatched: vec![],
+        matched: vec!['a', 'c'],
+        reached_eos: true
+    };
+
+    assert_eq!(result1, expected1);
+    assert_eq!(result2, expected2);
+    assert_eq!(result3, expected3);
+    assert_eq!(result4, expected4);
+    assert_eq!(result5, expected5);
+    assert_eq!(result6, expected6);
+
+    Ok(())
+}
+
+#[test]
+fn quantifier_at_most() -> Result<(), PipelineError<'static, char>>{
+
+    let result1 = begin_match("aab")
+    .with_quantifier(AtMost(NonZeroUsize::new(3).unwrap()), |p| p.match_symbol(&'a'))?
+    .match_symbol(&'b')?;
+
+    let expected1 = MatchingPipeline{
+        unmatched: vec![],
+        matched: vec!['a', 'a', 'b'],
+        reached_eos: true
+    };
+
+    let result2 = begin_match("aaaax")
+    .with_quantifier(AtMost(NonZeroUsize::new(3).unwrap()), |p| p.match_symbol(&'a'))?;
+
+    let expected2 = MatchingPipeline{
+        unmatched: vec!['a', 'x'],
+        matched: vec!['a', 'a', 'a'],
+        reached_eos: false
+    };
+
+    assert_eq!(result1, expected1);
+    assert_eq!(result2, expected2);
+
     Ok(())
 }
