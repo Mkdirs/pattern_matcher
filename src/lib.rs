@@ -4,7 +4,9 @@ use std::{error::Error, fmt::{Debug, Display}};
 mod tests;
 
 mod quantifiers;
+mod digesters;
 pub use quantifiers::*;
+pub use digesters::*;
 
 pub trait Symbol:PartialEq+Clone+Debug{}
 
@@ -28,6 +30,12 @@ pub struct MatchingPipeline<S:Symbol>{
     matched: Vec<S>,
     unmatched: Vec<S>,
     reached_eos: bool
+}
+
+#[derive(Debug)]
+pub struct TerminatedPipeline<S:Symbol>{
+    matched:Vec<S>,
+    unmatched:Vec<S>
 }
 
 #[derive(Debug, PartialEq)]
@@ -243,7 +251,23 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
         callback(self)
     }
 
+    pub fn terminate(self) -> TerminatedPipeline<S> {
+        TerminatedPipeline{
+            unmatched: self.unmatched,
+            matched: self.matched
+        }
+    }
+
     
+}
+
+impl<S:Symbol> TerminatedPipeline<S>{
+
+    pub fn digest<D>(self) -> <D as Digester<S>>::Output
+    where D: Digester<S>
+    {
+        D::digest(&self.matched)
+    }
 }
 
 
@@ -255,8 +279,35 @@ impl From<&str> for MatchingPipeline<char>{
     }
 }
 
-
 /// Creates a [MatchingPipeline]
 pub fn begin_match<S>(candidate: impl Into<MatchingPipeline<S>>) -> MatchingPipeline<S> where S:Symbol{
     candidate.into()
+}
+
+/// A convenient way to tell if a pattern match a pipeline or not
+/// while delegating the error handling in a function
+pub trait MatchAgainst<'a, S:Symbol+'a, F>
+where F: Fn(MatchingPipeline<S>) -> Result<TerminatedPipeline<S>, PipelineError<'a, S>>
+{
+    /// Matches a pattern against a pipeline
+    /// 
+    /// This was meant to relieve the immediate code of the error handling of the pipeline.
+    /// It is not recommended to use an anonymous function for callback.
+    /// 
+    /// Returns Some([TerminatedPipeline]) if successful
+    /// 
+    /// Returns None if not
+    fn match_against(self, callback: F) -> Option<TerminatedPipeline<S>>;
+}
+
+impl<'a, S:Symbol+'a, F, T> MatchAgainst<'a, S, F> for T
+where F: Fn(MatchingPipeline<S>) -> Result<TerminatedPipeline<S>, PipelineError<'a, S>>,
+T: Into<MatchingPipeline<S>>
+{
+    fn match_against(self, callback: F) -> Option<TerminatedPipeline<S>> {
+        if let Ok(pipeline) = callback(begin_match(self)){
+            return Some(pipeline)
+        }
+        None
+    }
 }
