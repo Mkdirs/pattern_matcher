@@ -280,6 +280,24 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
         Err(PipelineError::SymbolNotMatchingPredicate { actual: self.unmatched[0].clone() })
     }
 
+    pub fn match_while_true<F>(mut self, predicate: F) -> Self
+    where F: Fn(&S) -> bool
+    {
+        loop {
+            if self.reached_eos {
+                break;
+            }
+
+            if predicate(&self.unmatched[0]) {
+                self = self.consume();
+            }else{
+                break;
+            }
+        }
+
+        self
+    }
+
     /// Encapsulates the logic inside a closure
     pub fn block<F>(self, callback: F) -> PipelineResult<'a, S> where F: Fn(Self) -> PipelineResult<'a, S> {
         callback(self)
