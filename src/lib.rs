@@ -68,8 +68,8 @@ pub type PipelineResult<'a, Symbol> = Result<MatchingPipeline<Symbol>, PipelineE
 
 
 impl<'a, S:Symbol> MatchingPipeline<S>{
-    fn new(candidate: impl Iterator<Item = S>) -> Self{
-        let collection = candidate.collect::<Vec<S>>();
+    pub fn new(candidate: impl IntoIterator<Item = S>) -> Self{
+        let collection = candidate.into_iter().collect::<Vec<S>>();
         Self { matched: vec![], reached_eos: collection.is_empty(), unmatched: collection, cursor: 0  }
     }
 
@@ -123,7 +123,7 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
     /// Expects that `symbol` can be matched
     /// 
     /// * `symbol` - The expected symbol
-    pub fn match_symbol(self, symbol:&'a S) -> PipelineResult<'a, S>{
+    pub fn expect_symbol(self, symbol:&'a S) -> PipelineResult<'a, S>{
         if self.reached_eos {
             return Err(PipelineError::UnexpectedEos);
         }
@@ -140,13 +140,13 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
     /// Expects that `pattern` can be matched
     /// 
     /// * `pattern` - The expected pattern
-    pub fn match_pattern(mut self, pattern:&'a [S]) -> PipelineResult<'a, S>{
+    pub fn expect_pattern(mut self, pattern:&'a [S]) -> PipelineResult<'a, S>{
         let pipeline = self.clone();
         match pipeline.unmatched.get(0..pattern.len()) {
             Some(symbols) if symbols == pattern => {
                 for symbol in symbols{
                     //Todo: replace with consume()
-                    self = self.match_symbol(symbol).expect("All symbols should match");
+                    self = self.expect_symbol(symbol).expect("All symbols should match");
                 }
 
                 Ok(self)
@@ -163,7 +163,7 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
     /// Expects that `symbols` contains the current symbol 
     /// 
     /// * `symbols` - A list of symbols
-    pub fn match_any_of(mut self, symbols:&'a [S]) -> PipelineResult<'a, S> {
+    pub fn expect_any_of(mut self, symbols:&'a [S]) -> PipelineResult<'a, S> {
         if self.reached_eos {
             return Err(PipelineError::UnexpectedEos);
         }
@@ -185,7 +185,7 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
     /// `delim` is also matched
     /// 
     /// * `delim` - The delimiter pattern
-    pub fn match_until(mut self, delim:&[S]) -> PipelineResult<'a, S> {
+    pub fn match_until(mut self, delim:&[S]) -> Self {
     
         loop {
             if self.reached_eos {
@@ -194,7 +194,7 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
 
             let pipeline = self.clone();
             
-            if let Ok(s) = pipeline.match_pattern(delim){
+            if let Ok(s) = pipeline.expect_pattern(delim){
                 self = s;
                 break;
             }
@@ -203,11 +203,11 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
             
         }
 
-        Ok(self)
+        self
     }
 
     /// Expects that the current symbol matches the predicate.
-    pub fn match_predicate<F>(mut self, predicate: F) -> PipelineResult<'a, S>
+    pub fn expect_predicate<F>(mut self, predicate: F) -> PipelineResult<'a, S>
     where F: Fn(&S) -> bool
     {
         if self.reached_eos{
@@ -222,6 +222,7 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
         Err(PipelineError::SymbolNotMatchingPredicate { actual: self.unmatched[0].clone() })
     }
 
+    /// Matches all symbols until predicate fail or reaches end of stream.
     pub fn match_while_true<F>(mut self, predicate: F) -> Self
     where F: Fn(&S) -> bool
     {
@@ -277,23 +278,30 @@ impl<S:Symbol> TerminatedPipeline<S>{
     }
 }
 
+pub trait Matchable<S:Symbol>: Into<MatchingPipeline<S>> {}
 
 impl Symbol for char{}
 
-impl From<&str> for MatchingPipeline<char>{
-    fn from(value: &str) -> Self {
-        MatchingPipeline::new(value.chars())
+impl<T: AsRef<str>> Matchable<char> for T{}
+
+impl<T: AsRef<str>> From<T> for MatchingPipeline<char>{
+    fn from(value: T) -> Self {
+        MatchingPipeline::new(value.as_ref().chars())
     }
 }
 
+
+
+
+
 /// Creates a [MatchingPipeline]
-pub fn begin_match<S>(candidate: impl Into<MatchingPipeline<S>>) -> MatchingPipeline<S> where S:Symbol{
+pub fn begin_match<S>(candidate: impl Matchable<S>) -> MatchingPipeline<S> where S:Symbol{
     candidate.into()
 }
 
 /// A convenient way to tell if a pattern match a pipeline or not
 /// while delegating the error handling in a function
-pub trait MatchAgainst<'a, S:Symbol+'a, F>
+pub trait MatchAgainst<'a, S:Symbol+'a, F> : Clone
 where F: Fn(MatchingPipeline<S>) -> Result<TerminatedPipeline<S>, PipelineError<'a, S>>
 {
     /// Matches a pattern against a pipeline
@@ -304,15 +312,15 @@ where F: Fn(MatchingPipeline<S>) -> Result<TerminatedPipeline<S>, PipelineError<
     /// Returns Some([TerminatedPipeline]) if successful
     /// 
     /// Returns None if not
-    fn match_against(self, callback: F) -> Option<TerminatedPipeline<S>>;
+    fn match_against(&self, callback: F) -> Option<TerminatedPipeline<S>>;
 }
 
-impl<'a, S:Symbol+'a, F, T> MatchAgainst<'a, S, F> for T
+impl<'a, S:Symbol+'a, F, T:Clone> MatchAgainst<'a, S, F> for T
 where F: Fn(MatchingPipeline<S>) -> Result<TerminatedPipeline<S>, PipelineError<'a, S>>,
-T: Into<MatchingPipeline<S>>
+T: Matchable<S>
 {
-    fn match_against(self, callback: F) -> Option<TerminatedPipeline<S>> {
-        if let Ok(pipeline) = callback(begin_match(self)){
+    fn match_against(&self, callback: F) -> Option<TerminatedPipeline<S>> {
+        if let Ok(pipeline) = callback(begin_match(self.clone())){
             return Some(pipeline)
         }
         None
