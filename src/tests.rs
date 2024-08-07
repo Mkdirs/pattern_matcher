@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use crate::{begin_match, quantifiers::WithQuantifier, AtLeast, AtMost, Exactly, MatchingPipeline, PipelineError, SymbolGroup, ZeroOrOne};
+use crate::{begin_match, quantifiers::WithQuantifier, AtLeast, AtMost, Exactly, MatchingPipeline, PipelineError, ZeroOrOne};
 
 #[test]
 fn should_match_all_symbols() -> Result<(), PipelineError<'static, char>>{
@@ -149,32 +149,6 @@ fn should_match_any() -> Result<(), PipelineError<'static, char>>{
     Ok(())
 }
 
-#[test]
-fn should_match_any_group() -> Result<(), PipelineError<'static, char>>{
-    let terminator = SymbolGroup{
-        accepted_symbols: &[',', ';'],
-        description: "',' or ';'"
-    };
-
-    let result = begin_match("a;b,1")
-        .skip()
-        .match_any_of_group(terminator.clone())?
-        .skip()
-        .match_any_of_group(terminator)?
-        .skip();
-
-    let expected = MatchingPipeline{
-        matched: vec![';', ','],
-        unmatched: vec![],
-        reached_eos: true,
-        cursor: -1
-    };
-
-    assert_eq!(result, expected);
-
-    Ok(())
-        
-}
 
 #[test]
 fn state_should_be_preserved_in_block() -> Result<(), PipelineError<'static, char>>{

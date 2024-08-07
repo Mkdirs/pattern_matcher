@@ -10,20 +10,6 @@ pub use digesters::*;
 
 pub trait Symbol:PartialEq+Clone+Debug{}
 
-/// A struct representing a group of symbols
-#[derive(Debug, PartialEq, Clone)]
-pub struct SymbolGroup<'a, S:Symbol>{
-    pub accepted_symbols: &'a [S],
-    pub description: &'a str
-}
-
-impl<'a, S:Symbol> SymbolGroup<'a, S>{
-        /// Tells if a symbol is a part of the group or not
-        pub fn accept(&self, symbol: &S) -> bool {
-            self.accepted_symbols.contains(symbol)
-        }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 /// This structure helps you build a pattern matching pipeline
 pub struct MatchingPipeline<S:Symbol>{
@@ -52,10 +38,6 @@ pub enum PipelineError<'a, S:Symbol>{
         actual: Vec<S>
     },
 
-    SymbolNotPartOfGroup{
-        expected: SymbolGroup<'a, S>,
-        actual: S
-    },
 
     SymbolNotMatchAnyOf{
         expected: &'a [S],
@@ -74,7 +56,6 @@ impl<'a, S:Symbol> Display for PipelineError<'a, S>{
             &Self::WrongSymbol { expected, actual } => write!(f, "Expected {expected:?} but instead got {actual:?}"),
             &Self::WrongPattern { expected, actual } => write!(f, "Expected pattern {expected:?} but instead got {actual:?}"),
             &Self::SymbolNotMatchAnyOf { expected, actual } => write!(f, "Expected one of {expected:?} but instead got {actual:?}"),
-            &Self::SymbolNotPartOfGroup { expected, actual } => write!(f, "Expected one of {0:?} but instead got {actual:?}", expected.description),
             &Self::SymbolNotMatchingPredicate { actual } => write!(f, "{actual:?} does not match the given predicate")
         }
     }
@@ -198,23 +179,6 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
         Err(PipelineError::SymbolNotMatchAnyOf { expected: symbols, actual })
     }
 
-    /// Expects that the current symbol is part of [SymbolGroup]
-    pub fn match_any_of_group(mut self, group: SymbolGroup<'a, S>) -> PipelineResult<'a, S>{
-        if self.reached_eos {
-            return Err(PipelineError::UnexpectedEos);
-        }
-
-        let actual = self.unmatched.get(0).unwrap().clone();
-        if group.accept(&actual) {
-
-            self = self.consume();
-
-            return Ok(self);
-        }
-
-        Err(PipelineError::SymbolNotPartOfGroup { expected: group, actual })
-    }
-
 
     /// Matches all symbols until it matches the pattern `delim` or reaches end of stream
     /// 
@@ -237,28 +201,6 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
             self = self.consume();
 
             
-        }
-
-        Ok(self)
-    }
-
-    /// Matches all symbols until one is part of [SymbolGroup] or reaches end of stream
-    /// 
-    /// The delimiting symbol is also matched
-    pub fn match_until_group(mut self, group: &SymbolGroup<'a, S>) -> PipelineResult<'a, S> {
-        loop {
-            if self.reached_eos {
-                break;
-            }
-
-            let pipeline = self.clone();
-            let symbol = pipeline.unmatched.get(0).expect("Should not be empty");
-            if group.accept(symbol) {
-                self = pipeline.consume();
-                break;
-            }
-            
-            self = pipeline.consume();
         }
 
         Ok(self)
