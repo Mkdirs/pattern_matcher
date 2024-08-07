@@ -14,7 +14,8 @@ fn should_match_all_symbols() -> Result<(), PipelineError<'static, char>>{
     let expected = MatchingPipeline{
         matched: vec!['h', 'e', 'l', 'l', 'o'],
         unmatched: vec![],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     assert_eq!(result, expected);
@@ -44,7 +45,8 @@ fn should_not_reach_eos() -> Result<(), PipelineError<'static, char>>{
     let expected = MatchingPipeline{
         matched: vec!['F', 'o'],
         unmatched: vec!['x', 'y'],
-        reached_eos: false
+        reached_eos: false,
+        cursor: 2
     };
 
     assert_eq!(result, expected);
@@ -60,7 +62,8 @@ fn should_match_pattern() -> Result<(), PipelineError<'static, char>>{
     let expected = MatchingPipeline{
         matched: vec!['0','x','8','5','A','D','G'],
         unmatched: vec![' ','H','e','a','d','e','r'],
-        reached_eos: false
+        reached_eos: false,
+        cursor: 7
     };
 
     assert_eq!(result, expected);
@@ -97,7 +100,8 @@ fn should_match_until_comma() -> Result<(), PipelineError<'static, char>>{
     let expected = MatchingPipeline{
         matched: vec!['F','o','o',','],
         unmatched: vec!['B','a','r',' ',',','b','a','z'],
-        reached_eos: false
+        reached_eos: false,
+        cursor: 4
     };
 
     assert_eq!(result, expected);
@@ -115,7 +119,8 @@ fn should_skip() {
     let expected = MatchingPipeline{
         matched: vec!['F', 'x'],
         unmatched: vec![],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     assert_eq!(result, expected);
@@ -135,7 +140,8 @@ fn should_match_any() -> Result<(), PipelineError<'static, char>>{
     let expected = MatchingPipeline{
         matched: vec!['1', '2', '3'],
         unmatched: vec![],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     assert_eq!(result, expected);
@@ -160,7 +166,8 @@ fn should_match_any_group() -> Result<(), PipelineError<'static, char>>{
     let expected = MatchingPipeline{
         matched: vec![';', ','],
         unmatched: vec![],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     assert_eq!(result, expected);
@@ -181,7 +188,8 @@ fn state_should_be_preserved_in_block() -> Result<(), PipelineError<'static, cha
     let expected = MatchingPipeline{
         matched: vec!['a', 'b', 'c', 'F', 'o', 'o', '1', 'B', 'a'],
         unmatched: vec!['r', '2'],
-        reached_eos: false
+        reached_eos: false,
+        cursor: 9
     };
 
     assert_eq!(result, expected);
@@ -199,7 +207,8 @@ fn should_match_exactly_3() -> Result<(), PipelineError<'static, char>>{
     let expected = MatchingPipeline {
         matched: vec!['1','8','a', '1','8','b', '1','8','c'],
         unmatched: vec![],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     assert_eq!(result, expected);
@@ -235,7 +244,8 @@ fn quantifier_zero_or_one_with_trailing_expectation() -> Result<(), PipelineErro
     let expected1 = MatchingPipeline{
         unmatched: vec![],
         matched: vec!['a', 'b', 'c'],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     let result2 = begin_match(candidate2)
@@ -253,7 +263,8 @@ fn quantifier_zero_or_one_with_trailing_expectation() -> Result<(), PipelineErro
     let expected3 = MatchingPipeline{
         unmatched: vec![],
         matched: vec!['a', 'c'],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     let result4 = begin_match(candidate4)
@@ -288,7 +299,8 @@ fn quantifier_zero_or_one_without_trailing_expectation() -> Result<(), PipelineE
     let expected1 = MatchingPipeline{
         unmatched: vec!['c'],
         matched: vec!['a', 'b'],
-        reached_eos: false
+        reached_eos: false,
+        cursor: 2
     };
 
     let result2 = begin_match(candidate2)
@@ -298,7 +310,8 @@ fn quantifier_zero_or_one_without_trailing_expectation() -> Result<(), PipelineE
     let expected2 = MatchingPipeline{
         unmatched: vec![],
         matched: vec!['a', 'b'],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     let result3 = begin_match(candidate3)
@@ -308,7 +321,8 @@ fn quantifier_zero_or_one_without_trailing_expectation() -> Result<(), PipelineE
     let expected3 = MatchingPipeline{
         unmatched: vec!['c'],
         matched: vec!['a'],
-        reached_eos: false
+        reached_eos: false,
+        cursor: 1
     };
 
     let result4 = begin_match(candidate4)
@@ -318,7 +332,8 @@ fn quantifier_zero_or_one_without_trailing_expectation() -> Result<(), PipelineE
     let expected4 = MatchingPipeline{
         unmatched: vec!['x', 'c'],
         matched: vec!['a'],
-        reached_eos: false
+        reached_eos: false,
+        cursor: 1
     };
 
     assert_eq!(result1, expected1);
@@ -341,7 +356,8 @@ fn quantifier_at_least() -> Result<(), PipelineError<'static, char>> {
     let expected1 = MatchingPipeline{
         unmatched: vec![],
         matched: vec!['a', 'b', 'b', 'b', 'c'],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     let result2 = begin_match("abb")
@@ -364,7 +380,8 @@ fn quantifier_at_least() -> Result<(), PipelineError<'static, char>> {
     let expected4 = MatchingPipeline{
         unmatched: vec![],
         matched: vec!['a', 'b', 'b', 'b', 'c'],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     let result5 = begin_match("abbc")
@@ -375,7 +392,8 @@ fn quantifier_at_least() -> Result<(), PipelineError<'static, char>> {
     let expected5 = MatchingPipeline{
         unmatched: vec![],
         matched: vec!['a', 'b', 'b', 'c'],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     let result6 = begin_match("ac")
@@ -386,7 +404,8 @@ fn quantifier_at_least() -> Result<(), PipelineError<'static, char>> {
     let expected6 = MatchingPipeline{
         unmatched: vec![],
         matched: vec!['a', 'c'],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     assert_eq!(result1, expected1);
@@ -409,7 +428,8 @@ fn quantifier_at_most() -> Result<(), PipelineError<'static, char>>{
     let expected1 = MatchingPipeline{
         unmatched: vec![],
         matched: vec!['a', 'a', 'b'],
-        reached_eos: true
+        reached_eos: true,
+        cursor: -1
     };
 
     let result2 = begin_match("aaaax")
@@ -418,7 +438,8 @@ fn quantifier_at_most() -> Result<(), PipelineError<'static, char>>{
     let expected2 = MatchingPipeline{
         unmatched: vec!['a', 'x'],
         matched: vec!['a', 'a', 'a'],
-        reached_eos: false
+        reached_eos: false,
+        cursor: 3
     };
 
     assert_eq!(result1, expected1);

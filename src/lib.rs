@@ -29,13 +29,15 @@ impl<'a, S:Symbol> SymbolGroup<'a, S>{
 pub struct MatchingPipeline<S:Symbol>{
     matched: Vec<S>,
     unmatched: Vec<S>,
-    reached_eos: bool
+    reached_eos: bool,
+    cursor:isize
 }
 
 #[derive(Debug)]
 pub struct TerminatedPipeline<S:Symbol>{
     matched:Vec<S>,
-    unmatched:Vec<S>
+    unmatched:Vec<S>,
+    cursor: isize
 }
 
 #[derive(Debug, PartialEq)]
@@ -58,7 +60,9 @@ pub enum PipelineError<'a, S:Symbol>{
     SymbolNotMatchAnyOf{
         expected: &'a [S],
         actual: S
-    }
+    },
+
+    SymbolNotMatchingPredicate{actual: S}
 
 }
 
@@ -70,7 +74,8 @@ impl<'a, S:Symbol> Display for PipelineError<'a, S>{
             &Self::WrongSymbol { expected, actual } => write!(f, "Expected {expected:?} but instead got {actual:?}"),
             &Self::WrongPattern { expected, actual } => write!(f, "Expected pattern {expected:?} but instead got {actual:?}"),
             &Self::SymbolNotMatchAnyOf { expected, actual } => write!(f, "Expected one of {expected:?} but instead got {actual:?}"),
-            &Self::SymbolNotPartOfGroup { expected, actual } => write!(f, "Expected one of {0:?} but instead got {actual:?}", expected.description)
+            &Self::SymbolNotPartOfGroup { expected, actual } => write!(f, "Expected one of {0:?} but instead got {actual:?}", expected.description),
+            &Self::SymbolNotMatchingPredicate { actual } => write!(f, "{actual:?} does not match the given predicate")
         }
     }
 }
@@ -84,7 +89,7 @@ pub type PipelineResult<'a, Symbol> = Result<MatchingPipeline<Symbol>, PipelineE
 impl<'a, S:Symbol> MatchingPipeline<S>{
     fn new(candidate: impl Iterator<Item = S>) -> Self{
         let collection = candidate.collect::<Vec<S>>();
-        Self { matched: vec![], reached_eos: collection.is_empty(), unmatched: collection  }
+        Self { matched: vec![], reached_eos: collection.is_empty(), unmatched: collection, cursor: 0  }
     }
 
     /// Matches the current symbol:
@@ -103,6 +108,12 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
 
         self.reached_eos = self.unmatched.is_empty();
 
+        if !self.reached_eos {
+            self.cursor += 1;
+        }else {
+            self.cursor = -1;
+        }
+
         self
     }
 
@@ -116,7 +127,14 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
 
         self.unmatched = self.unmatched.get(1..).unwrap_or_default().to_vec();
 
+
         self.reached_eos = self.unmatched.is_empty();
+
+        if !self.reached_eos {
+            self.cursor += 1;
+        }else {
+            self.cursor = -1;
+        }
 
         self
     }
@@ -246,6 +264,22 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
         Ok(self)
     }
 
+    /// Expects that the current symbol matches the predicate.
+    pub fn match_predicate<F>(mut self, predicate: F) -> PipelineResult<'a, S>
+    where F: Fn(&S) -> bool
+    {
+        if self.reached_eos{
+            return Err(PipelineError::UnexpectedEos);
+        }
+
+        if predicate(&self.unmatched[0]) {
+            self = self.consume();
+            return Ok(self);
+        }
+
+        Err(PipelineError::SymbolNotMatchingPredicate { actual: self.unmatched[0].clone() })
+    }
+
     /// Encapsulates the logic inside a closure
     pub fn block<F>(self, callback: F) -> PipelineResult<'a, S> where F: Fn(Self) -> PipelineResult<'a, S> {
         callback(self)
@@ -254,7 +288,8 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
     pub fn terminate(self) -> TerminatedPipeline<S> {
         TerminatedPipeline{
             unmatched: self.unmatched,
-            matched: self.matched
+            matched: self.matched,
+            cursor: self.cursor
         }
     }
 
@@ -262,6 +297,18 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
 }
 
 impl<S:Symbol> TerminatedPipeline<S>{
+
+    pub fn matched(&self) -> &[S]{
+        &self.matched
+    }
+
+    pub fn unmatched(&self) -> &[S]{
+        &self.unmatched
+    }
+
+    pub fn cursor(&self) -> isize {
+        self.cursor
+    }
 
     pub fn digest<D>(self) -> <D as Digester<S>>::Output
     where D: Digester<S>
