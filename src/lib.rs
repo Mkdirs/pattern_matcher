@@ -16,14 +16,14 @@ pub struct MatchingPipeline<S:Symbol>{
     matched: Vec<S>,
     unmatched: Vec<S>,
     reached_eos: bool,
-    cursor:isize
+    offset:usize
 }
 
 #[derive(Debug)]
 pub struct TerminatedPipeline<S:Symbol>{
     matched:Vec<S>,
     unmatched:Vec<S>,
-    cursor: isize
+    offset: usize
 }
 
 #[derive(Debug, PartialEq)]
@@ -70,7 +70,7 @@ pub type PipelineResult<'a, Symbol> = Result<MatchingPipeline<Symbol>, PipelineE
 impl<'a, S:Symbol> MatchingPipeline<S>{
     pub fn new(candidate: impl IntoIterator<Item = S>) -> Self{
         let collection = candidate.into_iter().collect::<Vec<S>>();
-        Self { matched: vec![], reached_eos: collection.is_empty(), unmatched: collection, cursor: 0  }
+        Self { matched: vec![], reached_eos: collection.is_empty(), unmatched: collection, offset: 0  }
     }
 
     /// Matches the current symbol:
@@ -87,13 +87,11 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
         self.matched.append(&mut matched.to_vec());
         self.unmatched = unmatched.to_vec();
 
-        self.reached_eos = self.unmatched.is_empty();
-
         if !self.reached_eos {
-            self.cursor += 1;
-        }else {
-            self.cursor = -1;
+            self.offset += 1;
         }
+
+        self.reached_eos = self.unmatched.is_empty();
 
         self
     }
@@ -108,14 +106,11 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
 
         self.unmatched = self.unmatched.get(1..).unwrap_or_default().to_vec();
 
+        if !self.reached_eos {
+            self.offset += 1;
+        }
 
         self.reached_eos = self.unmatched.is_empty();
-
-        if !self.reached_eos {
-            self.cursor += 1;
-        }else {
-            self.cursor = -1;
-        }
 
         self
     }
@@ -250,7 +245,7 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
         TerminatedPipeline{
             unmatched: self.unmatched,
             matched: self.matched,
-            cursor: self.cursor
+            offset: self.offset
         }
     }
 
@@ -267,8 +262,8 @@ impl<S:Symbol> TerminatedPipeline<S>{
         &self.unmatched
     }
 
-    pub fn cursor(&self) -> isize {
-        self.cursor
+    pub fn offset(&self) -> usize {
+        self.offset
     }
 
     pub fn digest<D>(self) -> <D as Digester<S>>::Output
