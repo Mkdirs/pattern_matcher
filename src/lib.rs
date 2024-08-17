@@ -44,7 +44,9 @@ pub enum PipelineError<'a, S:Symbol>{
         actual: S
     },
 
-    SymbolNotMatchingPredicate{actual: S}
+    SymbolNotMatchingPredicate{actual: S},
+
+    Unexpected{ message: &'a str }
 
 }
 
@@ -56,7 +58,8 @@ impl<'a, S:Symbol> Display for PipelineError<'a, S>{
             &Self::WrongSymbol { expected, actual } => write!(f, "Expected {expected:?} but instead got {actual:?}"),
             &Self::WrongPattern { expected, actual } => write!(f, "Expected pattern {expected:?} but instead got {actual:?}"),
             &Self::SymbolNotMatchAnyOf { expected, actual } => write!(f, "Expected one of {expected:?} but instead got {actual:?}"),
-            &Self::SymbolNotMatchingPredicate { actual } => write!(f, "{actual:?} does not match the given predicate")
+            &Self::SymbolNotMatchingPredicate { actual } => write!(f, "{actual:?} does not match the given predicate"),
+            &Self::Unexpected{message} => write!(f, "Unexpected error: {message}")
         }
     }
 }
@@ -177,10 +180,10 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
 
     /// Matches all symbols until it matches the pattern `delim` or reaches end of stream
     /// 
-    /// `delim` is also matched
-    /// 
     /// * `delim` - The delimiter pattern
-    pub fn match_until(mut self, delim:&[S]) -> Self {
+    /// 
+    /// * `match_delim` - If the delimiter is matched or not
+    pub fn match_until(mut self, delim:&'a [S], match_delim:bool) -> Self {
     
         loop {
             if self.reached_eos {
@@ -190,9 +193,25 @@ impl<'a, S:Symbol> MatchingPipeline<S>{
             let pipeline = self.clone();
             
             if let Ok(s) = pipeline.expect_pattern(delim){
-                self = s;
+                if match_delim { self = s; }
                 break;
             }
+            self = self.consume();
+
+            
+        }
+
+        self
+    }
+
+    /// Matches all symbols until it reaches end of stream
+    pub fn match_until_eos(mut self) -> Self {
+    
+        loop {
+            if self.reached_eos {
+                break;
+            }
+
             self = self.consume();
 
             

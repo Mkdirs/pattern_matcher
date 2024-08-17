@@ -95,7 +95,7 @@ fn pattern_is_too_big() {
 #[test]
 fn should_match_until_comma(){
     let result = begin_match("Foo,Bar ,baz")
-        .match_until(&[',']);
+        .match_until(&[','], true);
 
     let expected = MatchingPipeline{
         matched: vec!['F','o','o',','],
